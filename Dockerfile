@@ -14,10 +14,11 @@ RUN apt-get update && apt-get install -y git wget ffmpeg libgl1 libglib2.0-0 lib
 RUN wget -qO- https://astral.sh/uv/install.sh | sh && ln -s /root/.local/bin/uv /usr/local/bin/uv
 
 # Install comfy-cli into system Python
-RUN pip install comfy-cli
+RUN pip install --no-cache-dir comfy-cli
 
 # Install ComfyUI
-RUN yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia || true
+ENV COMFYUI_NO_PROMPT=1
+RUN comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia
 
 WORKDIR /comfyui
 
@@ -26,7 +27,7 @@ ADD src/extra_model_paths.yaml ./
 WORKDIR /
 
 # Runtime dependencies
-RUN pip install runpod requests websocket-client
+RUN pip install --no-cache-dir runpod requests websocket-client
 
 ADD src/start.sh handler.py test_input.json .
 RUN chmod +x /start.sh
