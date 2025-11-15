@@ -17,7 +17,7 @@ RUN wget -qO- https://astral.sh/uv/install.sh | sh && ln -s /root/.local/bin/uv 
 RUN pip install comfy-cli
 
 # Install ComfyUI
-RUN comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia
+RUN yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia || true
 
 WORKDIR /comfyui
 
