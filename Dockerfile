@@ -5,33 +5,25 @@ ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_INPUT=1
 ENV PIP_PREFER_BINARY=1
 
-# ----------------------------------------------------
-# Install Python 3.12 + pip + system dependencies
-# ----------------------------------------------------
-# Install Python, pip, git and other necessary tools
+# Install Python + pip + deps
 RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
     python3-pip \
     git \
     wget \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
     ffmpeg \
-    && ln -sf /usr/bin/python3.12 /usr/bin/python \
-    && ln -sf /usr/bin/pip3 /usr/bin/pip
+    libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+# Create virtual environment
+RUN python3.12 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Upgrade pip to latest
+# Upgrade pip inside venv
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# ----------------------------------------------------
-# Clone ComfyUI repo
-# ----------------------------------------------------
+# Clone ComfyUI
 ARG COMFYUI_VERSION=latest
 WORKDIR /comfyui
 
@@ -41,19 +33,12 @@ RUN if [ "${COMFYUI_VERSION}" = "latest" ]; then \
         git clone --branch "${COMFYUI_VERSION}" --single-branch https://github.com/comfyanonymous/ComfyUI.git . ; \
     fi
 
-# ----------------------------------------------------
-# Install ComfyUI dependencies
-# ----------------------------------------------------
+# Install ComfyUI requirements
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ----------------------------------------------------
-# Runtime packages for serverless
-# ----------------------------------------------------
+# Serverless deps
 RUN pip install --no-cache-dir runpod requests websocket-client
 
-# ----------------------------------------------------
-# Extra paths + scripts
-# ----------------------------------------------------
 ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 ADD serverless.py test_input.json .
 
@@ -62,7 +47,4 @@ RUN chmod +x /usr/local/bin/comfy-node-install
 
 RUN mkdir -p models/checkpoints models/vae models/unet models/clip
 
-# ----------------------------------------------------
-# RunPod entrypoint
-# ----------------------------------------------------
 CMD ["python", "serverless.py"]
