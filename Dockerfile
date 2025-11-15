@@ -8,15 +8,23 @@ ENV PIP_PREFER_BINARY=1
 # ----------------------------------------------------
 # Install Python 3.12 + pip + system dependencies
 # ----------------------------------------------------
+# Install Python, git and other necessary tools
 RUN apt-get update && apt-get install -y \
-    python3 python3-pip python3-distutils python3-venv \
-    git wget curl ffmpeg \
-    libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    python3.12 \
+    python3.12-venv \
+    git \
+    wget \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    ffmpeg \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/bin/pip
 
-# Ensure python and pip point to Python 3.12
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1 && \
-    update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
+# Clean up to reduce image size
+RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip to latest
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
