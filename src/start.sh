@@ -6,18 +6,15 @@ export LD_PRELOAD="${TCMALLOC}"
 
 echo "worker-comfyui: Starting ComfyUI"
 
-# Allow operators to tweak verbosity; default is DEBUG.
+# Default log level
 : "${COMFY_LOG_LEVEL:=DEBUG}"
 
-# Serve the API and don't shutdown the container
+# Run ComfyUI API in foreground if serving locally, otherwise run main in foreground
 if [ "$SERVE_API_LOCALLY" == "true" ]; then
-    python -u /comfyui/main.py --disable-auto-launch --disable-metadata --listen --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
-
-    echo "worker-comfyui: Starting RunPod Handler"
-    python -u /handler.py --rp_serve_api --rp_api_host=0.0.0.0
+    echo "worker-comfyui: Serving ComfyUI API locally"
+    exec python -u /comfyui/main.py --disable-auto-launch --disable-metadata --listen \
+        --verbose "${COMFY_LOG_LEVEL}" --log-stdout
 else
-    python -u /comfyui/main.py --disable-auto-launch --disable-metadata --verbose "${COMFY_LOG_LEVEL}" --log-stdout &
-
-    echo "worker-comfyui: Starting RunPod Handler"
-    python -u /handler.py
+    echo "worker-comfyui: Starting handler for RunPod"
+    exec python -u /handler.py
 fi
