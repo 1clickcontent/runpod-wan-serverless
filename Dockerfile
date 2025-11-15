@@ -32,8 +32,7 @@ RUN pip install --no-cache-dir runpod requests websocket-client
 ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 
 # Add scripts and test input
-ADD src/start.sh handler.py test_input.json . 
-RUN chmod +x /start.sh
+ADD serverless.py test_input.json .
 
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
 RUN chmod +x /usr/local/bin/comfy-node-install
@@ -41,4 +40,4 @@ RUN chmod +x /usr/local/bin/comfy-node-install
 RUN mkdir -p models/checkpoints models/vae models/unet models/clip
 
 # Default command
-CMD ["/start.sh"]
+CMD ["python", "serverless.py"]
