@@ -9,16 +9,13 @@ ENV PYTHONUNBUFFERED=1
 ENV PIP_PREFER_BINARY=1
 
 # Install system tools (NOTE: includes git)
-RUN apt-get update && apt-get install -y \
-    git wget ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git wget ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install uv
-RUN wget -qO- https://astral.sh/uv/install.sh | sh && \
-    ln -s /root/.local/bin/uv /usr/local/bin/uv
+RUN wget -qO- https://astral.sh/uv/install.sh | sh && ln -s /root/.local/bin/uv /usr/local/bin/uv
 
 # Install comfy-cli into system Python
-RUN uv pip install --system comfy-cli
+RUN pip install comfy-cli
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
@@ -34,7 +31,7 @@ ADD src/extra_model_paths.yaml ./
 WORKDIR /
 
 # Runtime dependencies
-RUN uv pip install runpod requests websocket-client
+RUN pip install runpod requests websocket-client
 
 ADD src/start.sh handler.py test_input.json .
 RUN chmod +x /start.sh
