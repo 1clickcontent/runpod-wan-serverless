@@ -1,5 +1,5 @@
 # Base image
-ARG BASE_IMAGE=runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+ARG BASE_IMAGE=runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
 FROM ${BASE_IMAGE} AS base
 
 ARG COMFYUI_VERSION=latest
