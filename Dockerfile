@@ -2,7 +2,6 @@ ARG BASE_IMAGE=runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
 FROM ${BASE_IMAGE} AS base
 
 ARG COMFYUI_VERSION=latest
-ARG CUDA_VERSION_FOR_COMFY
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -18,11 +17,7 @@ RUN wget -qO- https://astral.sh/uv/install.sh | sh && ln -s /root/.local/bin/uv 
 RUN pip install comfy-cli
 
 # Install ComfyUI
-RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
-      yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --cuda-version "${CUDA_VERSION_FOR_COMFY}" --nvidia; \
-    else \
-      yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia; \
-    fi
+RUN comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia
 
 WORKDIR /comfyui
 
