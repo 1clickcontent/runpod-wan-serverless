@@ -38,15 +38,7 @@ RUN chmod +x /start.sh
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
 RUN chmod +x /usr/local/bin/comfy-node-install
 
-# Default command
-CMD ["/start.sh"]
-
-# ------------------------------
-# Multi-stage build for models
-# ------------------------------
-FROM base AS downloader
-WORKDIR /comfyui
 RUN mkdir -p models/checkpoints models/vae models/unet models/clip
 
-FROM base AS final
-COPY --from=downloader /comfyui/models /comfyui/models
+# Default command
+CMD ["/start.sh"]
