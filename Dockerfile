@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PIP_PREFER_BINARY=1
 
-# Install system tools only (NO PYTHON)
+# Install system tools (NOTE: includes git)
 RUN apt-get update && apt-get install -y \
     git wget ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y \
 RUN wget -qO- https://astral.sh/uv/install.sh | sh && \
     ln -s /root/.local/bin/uv /usr/local/bin/uv
 
-# Install comfy-cli
-RUN uv pip install comfy-cli
+# Install comfy-cli into system Python
+RUN uv pip install --system comfy-cli
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
