@@ -8,10 +8,11 @@ ENV PIP_PREFER_BINARY=1
 # ----------------------------------------------------
 # Install Python 3.12 + pip + system dependencies
 # ----------------------------------------------------
-# Install Python, git and other necessary tools
+# Install Python, pip, git and other necessary tools
 RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
+    python3-pip \
     git \
     wget \
     libgl1 \
@@ -23,7 +24,6 @@ RUN apt-get update && apt-get install -y \
     && ln -sf /usr/bin/python3.12 /usr/bin/python \
     && ln -sf /usr/bin/pip3 /usr/bin/pip
 
-# Clean up to reduce image size
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip to latest
