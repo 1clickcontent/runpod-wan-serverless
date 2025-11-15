@@ -1,3 +1,4 @@
+# Base image
 ARG BASE_IMAGE=runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
 FROM ${BASE_IMAGE} AS base
 
@@ -6,39 +7,43 @@ ARG COMFYUI_VERSION=latest
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PIP_PREFER_BINARY=1
+ENV PIP_NO_INPUT=1
 
-# Install system tools (NOTE: includes git)
-RUN apt-get update && apt-get install -y git wget ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install system tools (git, wget, ffmpeg, libraries)
+RUN apt-get update && apt-get install -y \
+        git wget ffmpeg libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-RUN wget -qO- https://astral.sh/uv/install.sh | sh && ln -s /root/.local/bin/uv /usr/local/bin/uv
-
-# Install comfy-cli into system Python
-RUN pip install --no-cache-dir comfy-cli
-
-# Install ComfyUI
-ENV COMFYUI_NO_PROMPT=1
-RUN comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia
-
+# Clone ComfyUI from GitHub directly
 WORKDIR /comfyui
+RUN if [ "${COMFYUI_VERSION}" = "latest" ]; then \
+        git clone https://github.com/comfyanonymous/ComfyUI.git . ; \
+    else \
+        git clone --branch "${COMFYUI_VERSION}" --single-branch https://github.com/comfyanonymous/ComfyUI.git . ; \
+    fi
 
-ADD src/extra_model_paths.yaml ./
-
-WORKDIR /
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Runtime dependencies
 RUN pip install --no-cache-dir runpod requests websocket-client
 
-ADD src/start.sh handler.py test_input.json .
+# Add extra model paths
+ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
+
+# Add scripts and test input
+ADD src/start.sh handler.py test_input.json . 
 RUN chmod +x /start.sh
 
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
 RUN chmod +x /usr/local/bin/comfy-node-install
 
-ENV PIP_NO_INPUT=1
-
+# Default command
 CMD ["/start.sh"]
 
+# ------------------------------
+# Multi-stage build for models
+# ------------------------------
 FROM base AS downloader
 WORKDIR /comfyui
 RUN mkdir -p models/checkpoints models/vae models/unet models/clip
