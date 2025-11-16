@@ -37,3 +37,7 @@ pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/ComfyUI-WanAnimatePreprocess/re
 echo "Cloning ComfyUI-KJNodes..."
 git clone https://github.com/kijai/ComfyUI-KJNodes.git "$CUSTOM_NODES_DIR/ComfyUI-KJNodes"
 pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/ComfyUI-KJNodes/requirements.txt"
+
+echo "Cloning rgthree-comfy..."
+git clone https://github.com/rgthree/rgthree-comfy.git "$CUSTOM_NODES_DIR/rgthree-comfy"
+pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/rgthree-comfy/requirements.txt"
