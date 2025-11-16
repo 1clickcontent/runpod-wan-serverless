@@ -46,6 +46,6 @@ RUN chmod +x /usr/local/bin/comfy-node-install
 RUN mkdir -p models/checkpoints models/vae models/unet models/clip
 
 # ---- Run custom node installer ----
-RUN comfy-node-install
+# RUN comfy-node-install
 
 CMD ["python", "serverless.py"]
