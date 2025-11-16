@@ -1,1 +1,5 @@
-{ "workflow": { "nodes": [] } }
+{
+  "input": {
+    "workflow": {"nodes":[{"class_type":"EmptyImage","inputs":{"width":64,"height":64,"color":"#000000"}}]}
+  }
+}
