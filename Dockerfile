@@ -33,7 +33,7 @@ RUN if [ "${COMFYUI_VERSION}" = "latest" ]; then \
         git clone --branch "${COMFYUI_VERSION}" --single-branch https://github.com/comfyanonymous/ComfyUI.git . ; \
     fi
 
-RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 \
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 \
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir runpod requests websocket-client
 
