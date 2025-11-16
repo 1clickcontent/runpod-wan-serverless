@@ -12,3 +12,5 @@ runpod_worker_comfy:
   unet: models/unet/
   text_encoders: models/text_encoders/
   sam2: models/sam2/
+  detection: models/detection/
+  diffusion_models: models/diffusion_models/
