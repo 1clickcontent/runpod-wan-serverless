@@ -52,8 +52,7 @@ def start_comfy():
         sys.executable, main_path, 
         "--port", str(COMFY_PORT), 
         "--listen", COMFY_HOST,
-        # Add the lowvram flag here for debugging:
-        "--lowvram"
+        "--disable-auto-launch"
     ]
 
     print("[serverless] Launching ComfyUI...")
