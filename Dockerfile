@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS base
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04 AS basee
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
