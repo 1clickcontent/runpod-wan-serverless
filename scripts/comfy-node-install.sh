@@ -27,9 +27,9 @@ git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git "$CUSTOM
 pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/ComfyUI-Frame-Interpolation/requirements-no-cupy.txt"
 
 echo "Cloning comfyui-tensorops..."
-git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git "$CUSTOM_NODES_DIR/comfyui-tensorops"
+git clone https://github.com/un-seen/comfyui-tensorops.git "$CUSTOM_NODES_DIR/comfyui-tensorops"
 pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/comfyui-tensorops/requirements.txt"
 
 echo "Cloning ComfyUI-WanAnimatePreprocess..."
-git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git "$CUSTOM_NODES_DIR/ComfyUI-WanAnimatePreprocess"
+git clone https://github.com/kijai/ComfyUI-WanAnimatePreprocess.git "$CUSTOM_NODES_DIR/ComfyUI-WanAnimatePreprocess"
 pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/ComfyUI-WanAnimatePreprocess/requirements.txt"
