@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04 AS base
+FROM nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04 AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -33,11 +33,9 @@ RUN if [ "${COMFYUI_VERSION}" = "latest" ]; then \
         git clone --branch "${COMFYUI_VERSION}" --single-branch https://github.com/comfyanonymous/ComfyUI.git . ; \
     fi
 
-# Install ComfyUI requirements
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Serverless deps
-RUN pip install --no-cache-dir runpod requests websocket-client
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 \
+    && pip install --no-cache-dir -r requirements.txt \
+    && pip install --no-cache-dir runpod requests websocket-client
 
 ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 ADD serverless.py test_input.json .
@@ -48,6 +46,6 @@ RUN chmod +x /usr/local/bin/comfy-node-install
 RUN mkdir -p models/checkpoints models/vae models/unet models/clip /runpod-volume/serverless-output
 
 # ---- Run custom node installer ----
-RUN comfy-node-install
+# RUN comfy-node-install
 
 CMD ["python", "serverless.py"]
