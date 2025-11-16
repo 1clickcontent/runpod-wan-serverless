@@ -3,7 +3,7 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-CUSTOM_NODES_DIR=" /comfyui/custom_nodes"
+CUSTOM_NODES_DIR="/comfyui/custom_nodes"
 
 mkdir -p $CUSTOM_NODES_DIR
 
