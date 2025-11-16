@@ -49,11 +49,12 @@ def start_comfy():
         sys.exit(1)
 
     cmd = [
-        sys.executable,
-        "main.py",
-        "--listen", "0.0.0.0",
-        "--port", str(COMFY_PORT),
-        "--disable-auto-launch"
+        sys.executable, main_path, 
+        "--port", str(COMFY_PORT), 
+        "--listen", COMFY_HOST, 
+        "--output-directory", "/runpod-volume/serverless-output",
+        # Add the lowvram flag here for debugging:
+        "--lowvram"
     ]
 
     print("[serverless] Launching ComfyUI...")
