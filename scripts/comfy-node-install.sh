@@ -24,4 +24,4 @@ git clone https://github.com/kijai/ComfyUI-segment-anything-2.git "$CUSTOM_NODES
 
 echo "Cloning ComfyUI-Frame-Interpolation..."
 git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git "$CUSTOM_NODES_DIR/ComfyUI-Frame-Interpolation"
-pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/ComfyUI-Frame-Interpolation/requirements-with-cupy.txt"
+pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/ComfyUI-Frame-Interpolation/requirements-no-cupy.txt"
