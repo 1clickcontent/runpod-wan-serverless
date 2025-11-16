@@ -33,3 +33,7 @@ pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/comfyui-tensorops/requirements.
 echo "Cloning ComfyUI-WanAnimatePreprocess..."
 git clone https://github.com/kijai/ComfyUI-WanAnimatePreprocess.git "$CUSTOM_NODES_DIR/ComfyUI-WanAnimatePreprocess"
 pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/ComfyUI-WanAnimatePreprocess/requirements.txt"
+
+echo "Cloning ComfyUI-KJNodes..."
+git clone https://github.com/kijai/ComfyUI-KJNodes.git "$CUSTOM_NODES_DIR/ComfyUI-KJNodes"
+pip install --no-cache-dir -r "$CUSTOM_NODES_DIR/ComfyUI-KJNodes/requirements.txt"
