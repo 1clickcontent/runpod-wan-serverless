@@ -51,8 +51,7 @@ def start_comfy():
     cmd = [
         sys.executable, main_path, 
         "--port", str(COMFY_PORT), 
-        "--listen", COMFY_HOST, 
-        "--output-directory", "/runpod-volume/serverless-output",
+        "--listen", COMFY_HOST,
         # Add the lowvram flag here for debugging:
         "--lowvram"
     ]

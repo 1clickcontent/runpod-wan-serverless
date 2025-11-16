@@ -43,7 +43,7 @@ ADD serverless.py test_input.json .
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
 RUN chmod +x /usr/local/bin/comfy-node-install
 
-RUN mkdir -p models/checkpoints models/vae models/unet models/clip /runpod-volume/serverless-output
+RUN mkdir -p models/checkpoints models/vae models/unet models/clip
 
 # ---- Run custom node installer ----
 # RUN comfy-node-install
