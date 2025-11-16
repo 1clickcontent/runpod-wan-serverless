@@ -40,12 +40,10 @@ RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://
 ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 ADD serverless.py test_input.json .
 
-COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
-RUN chmod +x /usr/local/bin/comfy-node-install
-
 RUN mkdir -p models/checkpoints models/vae models/unet models/clip
 
 # ---- Run custom node installer ----
-# RUN comfy-node-install
+ADD scripts/comfyui-node-install.sh ./comfyui-node-install.sh
+RUN chmod +x comfyui-node-install.sh && ./comfyui-node-install.sh
 
 CMD ["python", "serverless.py"]
