@@ -40,7 +40,7 @@ RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://
 ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 ADD serverless.py test_input.json .
 
-RUN mkdir -p models/checkpoints models/vae models/unet models/clip
+RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/diffusion_models models/detection
 
 # ---- Run custom node installer ----
 ADD scripts/comfy-node-install.sh ./comfy-node-install.sh
