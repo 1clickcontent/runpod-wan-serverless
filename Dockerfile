@@ -33,29 +33,22 @@ RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://
     && pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir runpod requests websocket-client
 
-ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
-ADD serverless.py test_input.json .
+RUN mkdir -p /runpod-volume/models
 
-# Create all necessary model directories that match the extra_model_paths.yaml structure
-RUN mkdir -p /runpod-volume/models/checkpoints \
-    /runpod-volume/models/vae \
-    /runpod-volume/models/unet \
-    /runpod-volume/models/clip \
-    /runpod-volume/models/diffusion_models \
-    /runpod-volume/models/detection \
-    /runpod-volume/models/clip_vision \
-    /runpod-volume/models/configs \
-    /runpod-volume/models/controlnet \
-    /runpod-volume/models/embeddings \
-    /runpod-volume/models/loras \
-    /runpod-volume/models/upscale_models \
-    /runpod-volume/models/sam2 \
-    /runpod-volume/models/text_encoders \
-    /runpod-volume/serverless-input \
-    /runpod-volume/serverless-output \
+WORKDIR /runpod-volume/models
 
-# ---- Run custom node installer ----
+RUN mkdir -p checkpoints vae unet clip diffusion_models detection clip_vision configs controlnet embeddings loras upscale_models sam2 text_encoders
+
+WORKDIR /runpod-volume
+
+RUN mkdir -p serverless-input serverless-output
+
+WORKDIR /comfyui
+
 ADD scripts/comfy-node-install.sh ./comfy-node-install.sh
 RUN chmod +x comfy-node-install.sh && ./comfy-node-install.sh
+
+ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
+ADD serverless.py test_input.json .
 
 CMD ["python", "serverless.py"]
