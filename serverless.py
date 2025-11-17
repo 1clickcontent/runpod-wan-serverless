@@ -40,6 +40,21 @@ def stream_logs(pipe, name):
 def start_comfy():
     global proc
 
+    # --- FIX: Ensure the output directory exists ---
+    OUTPUT_DIR = "/runpod-volume/serverless-output"
+    
+    try:
+        # os.makedirs creates directories recursively.
+        # exist_ok=True prevents an error if the directory already exists.
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        print(f"[serverless] Ensured output directory exists: {OUTPUT_DIR}")
+    except OSError as e:
+        # If the directory cannot be created (e.g., permission issue), log an error.
+        print(f"[serverless] FATAL ERROR: Failed to create output directory {OUTPUT_DIR}: {e}")
+        # It is highly recommended to exit here if output is critical
+        sys.exit(1) 
+    # --------------------------------------------------
+
     main_path = os.path.abspath("main.py")
     print(f"[serverless] Using Python: {sys.executable}")
     print(f"[serverless] Expected ComfyUI main.py at: {main_path}")
@@ -52,7 +67,8 @@ def start_comfy():
         sys.executable, main_path, 
         "--port", str(COMFY_PORT), 
         "--listen", COMFY_HOST,
-        "--output-directory", "/runpod-volume/serverless-output",
+        # Use the validated variable
+        "--output-directory", OUTPUT_DIR, 
         "--disable-auto-launch"
     ]
 
