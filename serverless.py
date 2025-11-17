@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+"""
+Improved serverless.py for RunPod + ComfyUI
+- Starts ComfyUI with real-time logs
+- Detects startup failures quickly
+- Returns clear error messages
+"""
+
 import json
 import os
 import requests
