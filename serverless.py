@@ -52,6 +52,7 @@ def start_comfy():
         sys.executable, main_path, 
         "--port", str(COMFY_PORT), 
         "--listen", COMFY_HOST,
+        "--output-directory", "/runpod-volume/serverless-output",
         "--disable-auto-launch"
     ]
 
