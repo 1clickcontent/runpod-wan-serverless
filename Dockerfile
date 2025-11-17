@@ -46,7 +46,7 @@ RUN mkdir -p serverless-input serverless-output
 WORKDIR /comfyui
 
 ADD scripts/comfy-node-install.sh ./comfy-node-install.sh
-# RUN chmod +x comfy-node-install.sh && ./comfy-node-install.sh
+RUN chmod +x comfy-node-install.sh && ./comfy-node-install.sh
 
 # ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 ADD serverless.py test_input.json .
