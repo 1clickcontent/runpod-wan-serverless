@@ -24,14 +24,10 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Clone ComfyUI
-ARG COMFYUI_VERSION=latest
+ARG COMFYUI_VERSION="v0.3.68"
 WORKDIR /comfyui
 
-RUN if [ "${COMFYUI_VERSION}" = "latest" ]; then \
-        git clone https://github.com/comfyanonymous/ComfyUI.git . ; \
-    else \
-        git clone --branch "${COMFYUI_VERSION}" --single-branch https://github.com/comfyanonymous/ComfyUI.git . ; \
-    fi
+RUN git clone --branch "${COMFYUI_VERSION}" --single-branch https://github.com/comfyanonymous/ComfyUI.git .
 
 RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 \
     && pip install --no-cache-dir -r requirements.txt \
