@@ -40,21 +40,12 @@ def stream_logs(pipe, name):
 def start_comfy():
     global proc
 
-    # --- FIX: Ensure the output directory exists ---
+    # Define directory paths
     OUTPUT_DIR = "/runpod-volume/serverless-output"
-    
-    try:
-        # os.makedirs creates directories recursively.
-        # exist_ok=True prevents an error if the directory already exists.
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        print(f"[serverless] Ensured output directory exists: {OUTPUT_DIR}")
-    except OSError as e:
-        # If the directory cannot be created (e.g., permission issue), log an error.
-        print(f"[serverless] FATAL ERROR: Failed to create output directory {OUTPUT_DIR}: {e}")
-        # It is highly recommended to exit here if output is critical
-        sys.exit(1) 
-    # --------------------------------------------------
+    INPUT_DIR = "/runpod-volume/serverless-input"
 
+    # --- Directory existence checks have been removed and replaced with conditional argument appending ---
+    
     main_path = os.path.abspath("main.py")
     print(f"[serverless] Using Python: {sys.executable}")
     print(f"[serverless] Expected ComfyUI main.py at: {main_path}")
@@ -63,14 +54,23 @@ def start_comfy():
         print("[ERROR] main.py not found! ComfyUI directory not correct!")
         sys.exit(1)
 
+    # --- Build the command list, starting with mandatory arguments ---
     cmd = [
         sys.executable, main_path, 
         "--port", str(COMFY_PORT), 
         "--listen", COMFY_HOST,
-        # Use the validated variable
-        "--output-directory", OUTPUT_DIR, 
         "--disable-auto-launch"
     ]
+
+    # Conditional logic for OUTPUT_DIR
+    if os.path.exists(OUTPUT_DIR):
+        cmd.extend(["--output-directory", OUTPUT_DIR])
+        print(f"[serverless] Adding --output-directory: {OUTPUT_DIR}")
+
+    # Conditional logic for INPUT_DIR
+    if os.path.exists(INPUT_DIR):
+        cmd.extend(["--input-directory", INPUT_DIR])
+        print(f"[serverless] Adding --input-directory: {INPUT_DIR}")
 
     print("[serverless] Launching ComfyUI...")
     proc = subprocess.Popen(
