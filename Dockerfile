@@ -43,10 +43,11 @@ WORKDIR /runpod-volume
 
 RUN mkdir -p serverless-input serverless-output
 
-WORKDIR /comfyui
+WORKDIR /comfyui/custom_nodes
 
-ADD scripts/comfy-node-install.sh ./comfy-node-install.sh
-RUN chmod +x comfy-node-install.sh && ./comfy-node-install.sh
+RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && pip install --no-cache-dir -r ComfyUI-WanVideoWrapper/requirements.txt
+
+WORKDIR /comfyui
 
 # ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 ADD serverless.py test_input.json .
