@@ -56,7 +56,7 @@ RUN git clone https://github.com/kijai/ComfyUI-KJNodes.git && pip install --no-c
 
 WORKDIR /comfyui
 
-# ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
+ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 ADD serverless.py test_input.json .
 
 CMD ["python", "serverless.py"]
