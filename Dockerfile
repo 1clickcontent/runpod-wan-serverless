@@ -46,6 +46,13 @@ RUN mkdir -p serverless-input serverless-output
 WORKDIR /comfyui/custom_nodes
 
 RUN git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && pip install --no-cache-dir -r ComfyUI-WanVideoWrapper/requirements.txt
+RUN git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git && pip install --no-cache-dir -r comfyui_controlnet_aux/requirements.txt
+RUN git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && pip install --no-cache-dir -r ComfyUI-VideoHelperSuite/requirements.txt
+RUN git clone https://github.com/kijai/ComfyUI-segment-anything-2.git
+RUN git clone https://github.com/Fannovel16/ComfyUI-Frame-Interpolation.git && pip install --no-cache-dir -r ComfyUI-Frame-Interpolation/requirements-no-cupy.txt
+RUN git clone https://github.com/un-seen/comfyui-tensorops.git && pip install --no-cache-dir -r comfyui-tensorops/requirements.txt
+RUN git clone https://github.com/kijai/ComfyUI-WanAnimatePreprocess.git && pip install --no-cache-dir -r ComfyUI-WanAnimatePreprocess/requirements.txt
+RUN git clone https://github.com/kijai/ComfyUI-KJNodes.git && pip install --no-cache-dir -r ComfyUI-KJNodes/requirements.txt
 
 WORKDIR /comfyui
 
