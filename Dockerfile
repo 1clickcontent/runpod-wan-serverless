@@ -77,6 +77,8 @@ ADD src/extra_model_paths.yaml ./extra_model_paths.yaml
 # Serverless entrypoint + optional test
 ADD serverless.py test_input.json .
 
+ADD src/execute_linux_command.py custom_nodes/execute_linux_command.py
+
 # ────────────────────────────────────────────
 # CMD for serverless
 # ────────────────────────────────────────────
