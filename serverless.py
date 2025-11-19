@@ -8,6 +8,7 @@ import subprocess
 from threading import Thread, Lock
 import runpod
 
+# ------------------ CONFIG ------------------
 COMFY_HOST = os.environ.get("COMFY_HOST", "127.0.0.1")
 COMFY_PORT = int(os.environ.get("COMFY_PORT", 8188))
 COMFY_BASE = f"http://{COMFY_HOST}:{COMFY_PORT}"
@@ -16,10 +17,11 @@ COMFY_INPUT_PATH = os.environ.get("COMFY_INPUT_PATH", "/runpod-volume/serverless
 BOOT_TIMEOUT = int(os.environ.get("COMFY_BOOT_WAIT", 180))
 REFRESH_WORKER = os.environ.get("REFRESH_WORKER", "false").lower() == "true"
 
+COMFY_POLLING_INTERVAL_MS = 5000  # 5 seconds
+COMFY_POLLING_MAX_RETRIES = 360   # ~30 minutes max wait
+
 proc = None
 proc_lock = Lock()
-COMFY_POLLING_INTERVAL_MS = 250
-COMFY_POLLING_MAX_RETRIES = 500
 
 # ------------------ UTILS ------------------
 
@@ -72,22 +74,24 @@ def wait_for_comfy(timeout=BOOT_TIMEOUT):
     print("[ERROR] ComfyUI did NOT start before timeout")
     return False
 
-def queue_prompt(workflow):
-    """Implements /prompt"""
-    data = json.dumps({"prompt": workflow}).encode("utf-8")
-    req = requests.post(f"{COMFY_BASE}/prompt", data=data, headers={"Content-Type": "application/json"})
-    return req.json()
+# ------------------ WORKFLOW ENDPOINTS ------------------
 
 def queue_comfyui_deploy(workflow):
     """Implements /comfyui-deploy/run"""
-    data = json.dumps(workflow).encode("utf-8")
-    req = requests.post(f"{COMFY_BASE}/comfyui-deploy/run", data=data, headers={"Content-Type": "application/json"})
-    return req.json()
+    try:
+        data = json.dumps(workflow).encode("utf-8")
+        req = requests.post(f"{COMFY_BASE}/comfyui-deploy/run", data=data, headers={"Content-Type": "application/json"})
+        return req.json()
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to queue workflow: {str(e)}"}
 
 def check_status(prompt_id):
     """Implements /comfyui-deploy/check-status"""
-    req = requests.get(f"{COMFY_BASE}/comfyui-deploy/check-status?prompt_id={prompt_id}")
-    return req.json()
+    try:
+        req = requests.get(f"{COMFY_BASE}/comfyui-deploy/check-status?prompt_id={prompt_id}")
+        return req.json()
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to check status: {str(e)}"}
 
 # ------------------ HANDLER ------------------
 
@@ -96,37 +100,40 @@ def handler(job):
     if not job_input:
         return {"error": "No input provided"}
 
-    endpoint = job_input.get("endpoint", "/prompt")  # default endpoint
     workflow = job_input.get("workflow")
     if not workflow:
         return {"error": "No workflow provided"}
 
-    # Queue workflow depending on the endpoint
-    if endpoint == "/prompt":
-        queued = queue_prompt(workflow)
-        return {"status": "queued", "response": queued}
-    elif endpoint == "/comfyui-deploy/run":
-        queued = queue_comfyui_deploy(workflow)
-        prompt_id = queued.get("prompt_id")
-        if not prompt_id:
-            return {"status": "error", "response": queued}
-        # Poll for completion
-        retries = 0
-        while retries < COMFY_POLLING_MAX_RETRIES:
-            st = check_status(prompt_id)
-            if st.get("status") in ["success", "failed"]:
-                return {"status": st.get("status"), "prompt_id": prompt_id, "response": st}
-            retries += 1
-            time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
-        return {"status": "error", "message": "Max retries reached"}
-    elif endpoint == "/comfyui-deploy/check-status":
-        prompt_id = job_input.get("prompt_id")
-        if not prompt_id:
-            return {"error": "prompt_id is required for check-status"}
-        st = check_status(prompt_id)
-        return {"status": st.get("status"), "prompt_id": prompt_id, "response": st}
-    else:
-        return {"error": f"Unknown endpoint: {endpoint}"}
+    # Queue workflow
+    queued = queue_comfyui_deploy(workflow)
+    if queued.get("status") == "error" or not queued.get("prompt_id"):
+        return {"status": "error", "response": queued}
+
+    prompt_id = queued["prompt_id"]
+    print(f"[serverless] Workflow queued with prompt_id: {prompt_id}")
+
+    # Poll for completion
+    retries = 0
+    while retries < COMFY_POLLING_MAX_RETRIES:
+        status_result = check_status(prompt_id)
+        status = status_result.get("status", "").lower()
+        if status in ["success", "failed", "completed"]:
+            return {
+                "status": status,
+                "prompt_id": prompt_id,
+                "response": status_result,
+                "refresh_worker": REFRESH_WORKER
+            }
+        print(f"[serverless] Workflow in progress... retry {retries}")
+        retries += 1
+        time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
+
+    return {
+        "status": "error",
+        "prompt_id": prompt_id,
+        "message": "Max retries reached while waiting for workflow to complete",
+        "refresh_worker": REFRESH_WORKER
+    }
 
 # ------------------ MAIN ------------------
 
