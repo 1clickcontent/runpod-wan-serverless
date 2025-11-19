@@ -6,6 +6,7 @@ import json
 import requests
 import subprocess
 from threading import Thread, Lock
+from queue import Queue, Empty
 import runpod
 
 # ------------------ CONFIG ------------------
@@ -26,10 +27,15 @@ proc_lock = Lock()
 COMFY_POLLING_INTERVAL_MS = 5000        # check every 5 seconds
 COMFY_MAX_WAIT_SECONDS = 20 * 60        # 20 minutes
 
+# Queue to collect log lines
+log_queue = Queue()
+
 # ------------------ UTILS ------------------
 def stream_logs(pipe, name):
     for line in iter(pipe.readline, b''):
-        print(f"[ComfyUI:{name}] {line.decode().rstrip()}", flush=True)
+        decoded = line.decode().rstrip()
+        print(f"[ComfyUI:{name}] {decoded}", flush=True)
+        log_queue.put(decoded)  # push every line into the queue
     pipe.close()
 
 def start_comfy():
@@ -83,7 +89,6 @@ def wait_for_comfy(timeout=BOOT_TIMEOUT):
 
 def queue_comfyui_deploy(workflow):
     try:
-        # Only parse JSON if it's a string
         if isinstance(workflow, str):
             try:
                 workflow = json.loads(workflow)
@@ -102,13 +107,6 @@ def queue_comfyui_deploy(workflow):
 
     except Exception as e:
         return {"status": "error", "message": f"Failed to queue workflow: {str(e)}"}
-
-def check_status(prompt_id):
-    try:
-        req = requests.get(f"{COMFY_BASE}/history/{prompt_id}")
-        return req.json()
-    except Exception as e:
-        return {"status": "error", "message": f"Status check failed: {str(e)}"}
 
 # ------------------ HANDLER ------------------
 def handler(job):
@@ -135,36 +133,35 @@ def handler(job):
         print(f"[serverless] Failed to queue workflow: {queued}")
         return {"status": "error", "response": queued, "refresh_worker": REFRESH_WORKER}
 
-    # Poll for completion (up to 20 minutes)
+    # Poll logs for completion (up to 20 minutes)
     deadline = time.time() + COMFY_MAX_WAIT_SECONDS
-    print(f"[serverless] Waiting up to 20 minutes for workflow result...")
+    print(f"[serverless] Waiting up to 20 minutes for workflow completion...")
 
     while time.time() < deadline:
         try:
-            status_result = check_status(prompt_id)
-            print(f"[serverless] Status check result: {json.dumps(status_result)}")  # <-- log the full result
-
-            status = str(status_result.get("status", "")).lower()
-
-            if status in ["success", "failed", "completed"]:
-                print(f"[serverless] Workflow completed with status: {status}")
-                return {
-                    "status": status,
-                    "prompt_id": prompt_id,
-                    "response": status_result,
-                    "refresh_worker": REFRESH_WORKER
-                }
+            while True:
+                try:
+                    line = log_queue.get_nowait()
+                    if "Prompt executed" in line:
+                        print(f"[serverless] Workflow completed according to logs: {line}")
+                        return {
+                            "status": "success",
+                            "prompt_id": prompt_id,
+                            "response": {"message": line},
+                            "refresh_worker": REFRESH_WORKER
+                        }
+                except Empty:
+                    break  # no new logs, continue waiting
 
         except Exception as e:
-            print(f"[ERROR] Checking status failed: {e}")
+            print(f"[ERROR] Log monitoring failed: {e}")
 
         time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
 
-    # Timeout fallback
     return {
         "status": "timeout",
         "prompt_id": prompt_id,
-        "message": "Workflow exceeded 20 minute limit",
+        "message": "Workflow did not complete within 20 minutes",
         "refresh_worker": REFRESH_WORKER
     }
 
