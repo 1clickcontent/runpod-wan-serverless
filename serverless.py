@@ -8,6 +8,7 @@ import subprocess
 from threading import Thread, Lock
 import runpod
 
+# ------------------ CONFIG ------------------
 COMFY_HOST = os.environ.get("COMFY_HOST", "127.0.0.1")
 COMFY_PORT = int(os.environ.get("COMFY_PORT", 8188))
 COMFY_BASE = f"http://{COMFY_HOST}:{COMFY_PORT}"
@@ -21,18 +22,15 @@ REFRESH_WORKER = os.environ.get("REFRESH_WORKER", "false").lower() == "true"
 proc = None
 proc_lock = Lock()
 
-# FAST POLLING BUT LONG TIMEOUT
-COMFY_POLLING_INTERVAL_MS = 5000    # after 5 seconds
-COMFY_MAX_WAIT_SECONDS = 20 * 60   # 20 minutes
-
+# Polling interval and max wait time for long workflows
+COMFY_POLLING_INTERVAL_MS = 5000        # check every 5 seconds
+COMFY_MAX_WAIT_SECONDS = 20 * 60        # 20 minutes
 
 # ------------------ UTILS ------------------
-
 def stream_logs(pipe, name):
     for line in iter(pipe.readline, b''):
         print(f"[ComfyUI:{name}] {line.decode().rstrip()}", flush=True)
     pipe.close()
-
 
 def start_comfy():
     global proc
@@ -63,10 +61,8 @@ def start_comfy():
         stderr=subprocess.PIPE,
         bufsize=1
     )
-
     Thread(target=stream_logs, args=(proc.stdout, "stdout"), daemon=True).start()
     Thread(target=stream_logs, args=(proc.stderr, "stderr"), daemon=True).start()
-
 
 def wait_for_comfy(timeout=BOOT_TIMEOUT):
     deadline = time.time() + timeout
@@ -85,12 +81,16 @@ def wait_for_comfy(timeout=BOOT_TIMEOUT):
     print("[ERROR] ComfyUI did NOT start before timeout")
     return False
 
-
 def queue_comfyui_deploy(workflow):
     try:
+        # Only parse JSON if it's a string
         if isinstance(workflow, str):
-            workflow = json.loads(workflow)
+            try:
+                workflow = json.loads(workflow)
+            except:
+                pass  # Already a dict or invalid, leave it
 
+        # Wrap workflow if necessary
         if "prompt" not in workflow:
             workflow = {"prompt": workflow}
 
@@ -99,9 +99,9 @@ def queue_comfyui_deploy(workflow):
             json=workflow
         )
         return req.json()
+
     except Exception as e:
         return {"status": "error", "message": f"Failed to queue workflow: {str(e)}"}
-
 
 def check_status(prompt_id):
     try:
@@ -110,9 +110,7 @@ def check_status(prompt_id):
     except Exception as e:
         return {"status": "error", "message": f"Status check failed: {str(e)}"}
 
-
 # ------------------ HANDLER ------------------
-
 def handler(job):
     job_input = job.get("input")
     if not job_input:
@@ -122,20 +120,21 @@ def handler(job):
     if not workflow:
         return {"error": "No workflow provided"}
 
+    # Ensure workflow is a dict
     if isinstance(workflow, str):
         try:
             workflow = json.loads(workflow)
         except Exception as e:
             return {"status": "error", "message": f"Invalid JSON workflow: {str(e)}"}
 
-    # Queue job
+    # Queue the workflow
     queued = queue_comfyui_deploy(workflow)
     prompt_id = queued.get("prompt_id")
 
     if not prompt_id:
         return {"status": "error", "response": queued, "refresh_worker": REFRESH_WORKER}
 
-    # ---- WAIT UP TO 20 MINUTES ----
+    # Poll for completion (up to 20 minutes)
     deadline = time.time() + COMFY_MAX_WAIT_SECONDS
     print(f"[serverless] Waiting up to 20 minutes for result...")
 
@@ -164,9 +163,7 @@ def handler(job):
         "refresh_worker": REFRESH_WORKER
     }
 
-
 # ------------------ MAIN ------------------
-
 if __name__ == "__main__":
     start_comfy()
     if not wait_for_comfy():
