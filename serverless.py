@@ -44,7 +44,7 @@ def start_comfy():
     OUTPUT_DIR = "/runpod-volume/serverless-output"
     INPUT_DIR = "/runpod-volume/serverless-input"
 
-    main_path = os.path.abspath("main.py")
+    main_path = "main.py"
     print(f"[serverless] Using Python: {sys.executable}")
     print(f"[serverless] Expected ComfyUI main.py at: {main_path}")
 
