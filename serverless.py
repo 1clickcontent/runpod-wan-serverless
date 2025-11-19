@@ -132,18 +132,22 @@ def handler(job):
     prompt_id = queued.get("prompt_id")
 
     if not prompt_id:
+        print(f"[serverless] Failed to queue workflow: {queued}")
         return {"status": "error", "response": queued, "refresh_worker": REFRESH_WORKER}
 
     # Poll for completion (up to 20 minutes)
     deadline = time.time() + COMFY_MAX_WAIT_SECONDS
-    print(f"[serverless] Waiting up to 20 minutes for result...")
+    print(f"[serverless] Waiting up to 20 minutes for workflow result...")
 
     while time.time() < deadline:
         try:
             status_result = check_status(prompt_id)
+            print(f"[serverless] Status check result: {json.dumps(status_result)}")  # <-- log the full result
+
             status = str(status_result.get("status", "")).lower()
 
             if status in ["success", "failed", "completed"]:
+                print(f"[serverless] Workflow completed with status: {status}")
                 return {
                     "status": status,
                     "prompt_id": prompt_id,
@@ -156,6 +160,7 @@ def handler(job):
 
         time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
 
+    # Timeout fallback
     return {
         "status": "timeout",
         "prompt_id": prompt_id,
