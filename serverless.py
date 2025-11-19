@@ -1,218 +1,137 @@
 #!/usr/bin/env python3
-"""
-Improved serverless.py for RunPod + ComfyUI
-- Starts ComfyUI with real-time logs
-- Detects startup failures quickly
-- Returns clear error messages
-"""
-
-import json
 import os
+import sys
+import time
+import json
 import requests
 import subprocess
-import time
-import sys
-import runpod
 from threading import Thread, Lock
+import runpod
 
 COMFY_HOST = os.environ.get("COMFY_HOST", "127.0.0.1")
 COMFY_PORT = int(os.environ.get("COMFY_PORT", 8188))
 COMFY_BASE = f"http://{COMFY_HOST}:{COMFY_PORT}"
+COMFY_OUTPUT_PATH = os.environ.get("COMFY_OUTPUT_PATH", "/runpod-volume/serverless-output")
+COMFY_INPUT_PATH = os.environ.get("COMFY_INPUT_PATH", "/runpod-volume/serverless-input")
 BOOT_TIMEOUT = int(os.environ.get("COMFY_BOOT_WAIT", 180))
+REFRESH_WORKER = os.environ.get("REFRESH_WORKER", "false").lower() == "true"
 
-proc = None        # global ComfyUI process
-proc_lock = Lock() # for thread-safe reading
+proc = None
+proc_lock = Lock()
+COMFY_POLLING_INTERVAL_MS = 250
+COMFY_POLLING_MAX_RETRIES = 500
 
-# -------------------------------------------------------------------
-# Utils
-# -------------------------------------------------------------------
+# ------------------ UTILS ------------------
 
 def stream_logs(pipe, name):
-    """Stream ComfyUI logs into container output."""
     for line in iter(pipe.readline, b''):
         print(f"[ComfyUI:{name}] {line.decode().rstrip()}", flush=True)
     pipe.close()
 
-# -------------------------------------------------------------------
-# Start ComfyUI
-# -------------------------------------------------------------------
-
 def start_comfy():
     global proc
-
-    # Define directory paths
-    OUTPUT_DIR = "/runpod-volume/serverless-output"
-    INPUT_DIR = "/runpod-volume/serverless-input"
-
     main_path = "main.py"
-    print(f"[serverless] Using Python: {sys.executable}")
-    print(f"[serverless] Expected ComfyUI main.py at: {main_path}")
-
     if not os.path.exists(main_path):
-        print("[ERROR] main.py not found! ComfyUI directory not correct!")
+        print("[ERROR] main.py not found!")
         sys.exit(1)
 
     cmd = [
-        sys.executable, main_path, 
-        "--port", str(COMFY_PORT), 
+        sys.executable, main_path,
+        "--port", str(COMFY_PORT),
         "--listen", COMFY_HOST,
         "--disable-auto-launch"
     ]
 
-    # Conditional logic for OUTPUT_DIR
-    if os.path.exists(OUTPUT_DIR):
-        cmd.extend(["--output-directory", OUTPUT_DIR])
-        print(f"[serverless] Adding --output-directory: {OUTPUT_DIR}")
+    if os.path.exists(COMFY_OUTPUT_PATH):
+        cmd.extend(["--output-directory", COMFY_OUTPUT_PATH])
+        print(f"[serverless] Using output: {COMFY_OUTPUT_PATH}")
 
-    # Conditional logic for INPUT_DIR
-    if os.path.exists(INPUT_DIR):
-        cmd.extend(["--input-directory", INPUT_DIR])
-        print(f"[serverless] Adding --input-directory: {INPUT_DIR}")
+    if os.path.exists(COMFY_INPUT_PATH):
+        cmd.extend(["--input-directory", COMFY_INPUT_PATH])
+        print(f"[serverless] Using input: {COMFY_INPUT_PATH}")
 
     print("[serverless] Launching ComfyUI...")
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        bufsize=1
-    )
-
-    # Start log threads
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1)
     Thread(target=stream_logs, args=(proc.stdout, "stdout"), daemon=True).start()
     Thread(target=stream_logs, args=(proc.stderr, "stderr"), daemon=True).start()
 
-    print(f"[serverless] ComfyUI started with PID {proc.pid}")
-
-# -------------------------------------------------------------------
-# Wait for ComfyUI
-# -------------------------------------------------------------------
-
 def wait_for_comfy(timeout=BOOT_TIMEOUT):
-    print(f"[serverless] Waiting for ComfyUI @ {COMFY_BASE}/system_stats (max {timeout}s)...")
-
     deadline = time.time() + timeout
     while time.time() < deadline:
-
-        # Detect crash early
         if proc.poll() is not None:
-            print("[ERROR] ComfyUI process exited prematurely.")
+            print("[ERROR] ComfyUI exited prematurely")
             return False
-
         try:
             r = requests.get(f"{COMFY_BASE}/system_stats", timeout=3)
             if r.status_code == 200:
-                print("[serverless] ComfyUI is READY.")
+                print("[serverless] ComfyUI is READY")
                 return True
         except:
             pass
-
         time.sleep(1)
-
-    print("[ERROR] ComfyUI did NOT start before timeout.")
+    print("[ERROR] ComfyUI did NOT start before timeout")
     return False
 
-# -------------------------------------------------------------------
-# Workflow helpers
-# -------------------------------------------------------------------
+def queue_prompt(workflow):
+    """Implements /prompt"""
+    data = json.dumps({"prompt": workflow}).encode("utf-8")
+    req = requests.post(f"{COMFY_BASE}/prompt", data=data, headers={"Content-Type": "application/json"})
+    return req.json()
 
-def comfy_list_nodes():
-    try:
-        r = requests.get(f"{COMFY_BASE}/nodes", timeout=5)
-        if r.ok:
-            return r.json()
-    except Exception as e:
-        print("[serverless] Node list error:", e)
-    return []
+def queue_comfyui_deploy(workflow):
+    """Implements /comfyui-deploy/run"""
+    data = json.dumps(workflow).encode("utf-8")
+    req = requests.post(f"{COMFY_BASE}/comfyui-deploy/run", data=data, headers={"Content-Type": "application/json"})
+    return req.json()
 
-def extract_node_class_types(workflow):
-    class_set = set()
-    if not workflow:
-        return class_set
+def check_status(prompt_id):
+    """Implements /comfyui-deploy/check-status"""
+    req = requests.get(f"{COMFY_BASE}/comfyui-deploy/check-status?prompt_id={prompt_id}")
+    return req.json()
 
-    nodes = (
-        workflow.get("nodes") or
-        workflow.get("nodes_info") or
-        workflow.get("graph") or
-        workflow.get("node_list")
-    )
-
-    if isinstance(nodes, list):
-        for n in nodes:
-            t = n.get("class_type") or n.get("type") or n.get("class")
-            if isinstance(t, str):
-                class_set.add(t)
-
-    return class_set
-
-def check_nodes_exist(required_classes):
-    available = comfy_list_nodes()
-    available_classes = set()
-
-    for a in available:
-        name = a.get("type") or a.get("class_type") or a.get("class")
-        if isinstance(name, str):
-            available_classes.add(name)
-
-    return [c for c in required_classes if c not in available_classes]
-
-# -------------------------------------------------------------------
-# Run workflow
-# -------------------------------------------------------------------
-
-def run_workflow_on_comfy(workflow):
-    payload = {"prompt": workflow}
-    endpoints = ["/prompt", "/run"]
-
-    for ep in endpoints:
-        try:
-            print(f"[serverless] Sending workflow → {ep}")
-            r = requests.post(f"{COMFY_BASE}{ep}", json=payload, timeout=3600)
-
-            try:
-                return r.status_code, r.json()
-            except:
-                return r.status_code, {"raw": r.text}
-
-        except Exception as e:
-            print(f"[serverless] Error sending to {ep}: {e}")
-
-    raise RuntimeError("All ComfyUI endpoints failed")
-
-# -------------------------------------------------------------------
-# RunPod handler
-# -------------------------------------------------------------------
+# ------------------ HANDLER ------------------
 
 def handler(job):
-    print("[serverless] Received job:", job.get("id"))
+    job_input = job.get("input")
+    if not job_input:
+        return {"error": "No input provided"}
 
-    input_data = job.get("input") or {}
-    workflow = input_data.get("workflow")
-
+    endpoint = job_input.get("endpoint", "/prompt")  # default endpoint
+    workflow = job_input.get("workflow")
     if not workflow:
-        return {"ok": False, "error": "No workflow provided"}
+        return {"error": "No workflow provided"}
 
-    required = extract_node_class_types(workflow)
-    print("[serverless] Workflow needs:", required)
+    # Queue workflow depending on the endpoint
+    if endpoint == "/prompt":
+        queued = queue_prompt(workflow)
+        return {"status": "queued", "response": queued}
+    elif endpoint == "/comfyui-deploy/run":
+        queued = queue_comfyui_deploy(workflow)
+        prompt_id = queued.get("prompt_id")
+        if not prompt_id:
+            return {"status": "error", "response": queued}
+        # Poll for completion
+        retries = 0
+        while retries < COMFY_POLLING_MAX_RETRIES:
+            st = check_status(prompt_id)
+            if st.get("status") in ["success", "failed"]:
+                return {"status": st.get("status"), "prompt_id": prompt_id, "response": st}
+            retries += 1
+            time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
+        return {"status": "error", "message": "Max retries reached"}
+    elif endpoint == "/comfyui-deploy/check-status":
+        prompt_id = job_input.get("prompt_id")
+        if not prompt_id:
+            return {"error": "prompt_id is required for check-status"}
+        st = check_status(prompt_id)
+        return {"status": st.get("status"), "prompt_id": prompt_id, "response": st}
+    else:
+        return {"error": f"Unknown endpoint: {endpoint}"}
 
-    missing = check_nodes_exist(required)
-    if missing:
-        return {"ok": False, "error": "Missing nodes", "missing": missing}
-
-    status, body = run_workflow_on_comfy(workflow)
-    print("[serverless] Job completed, status:", status)
-
-    return {"ok": True, "status": status, "body": body}
-
-# -------------------------------------------------------------------
-# Main entry
-# -------------------------------------------------------------------
+# ------------------ MAIN ------------------
 
 if __name__ == "__main__":
     start_comfy()
-
     if not wait_for_comfy():
-        print("[serverless] FATAL: ComfyUI failed to start.")
         sys.exit(1)
-
-    print("[serverless] Starting RunPod handler...")
     runpod.serverless.start({"handler": handler})
