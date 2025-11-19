@@ -11,15 +11,20 @@ import runpod
 COMFY_HOST = os.environ.get("COMFY_HOST", "127.0.0.1")
 COMFY_PORT = int(os.environ.get("COMFY_PORT", 8188))
 COMFY_BASE = f"http://{COMFY_HOST}:{COMFY_PORT}"
+
 COMFY_OUTPUT_PATH = os.environ.get("COMFY_OUTPUT_PATH", "/runpod-volume/serverless-output")
 COMFY_INPUT_PATH = os.environ.get("COMFY_INPUT_PATH", "/runpod-volume/serverless-input")
+
 BOOT_TIMEOUT = int(os.environ.get("COMFY_BOOT_WAIT", 180))
 REFRESH_WORKER = os.environ.get("REFRESH_WORKER", "false").lower() == "true"
 
 proc = None
 proc_lock = Lock()
-COMFY_POLLING_INTERVAL_MS = 250 # 5 seconds
-COMFY_POLLING_MAX_RETRIES = 500 # 30 minutes
+
+# FAST POLLING BUT LONG TIMEOUT
+COMFY_POLLING_INTERVAL_MS = 5000    # after 5 seconds
+COMFY_MAX_WAIT_SECONDS = 20 * 60   # 20 minutes
+
 
 # ------------------ UTILS ------------------
 
@@ -27,6 +32,7 @@ def stream_logs(pipe, name):
     for line in iter(pipe.readline, b''):
         print(f"[ComfyUI:{name}] {line.decode().rstrip()}", flush=True)
     pipe.close()
+
 
 def start_comfy():
     global proc
@@ -51,9 +57,16 @@ def start_comfy():
         print(f"[serverless] Using input: {COMFY_INPUT_PATH}")
 
     print("[serverless] Launching ComfyUI...")
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1)
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        bufsize=1
+    )
+
     Thread(target=stream_logs, args=(proc.stdout, "stdout"), daemon=True).start()
     Thread(target=stream_logs, args=(proc.stderr, "stderr"), daemon=True).start()
+
 
 def wait_for_comfy(timeout=BOOT_TIMEOUT):
     deadline = time.time() + timeout
@@ -72,23 +85,31 @@ def wait_for_comfy(timeout=BOOT_TIMEOUT):
     print("[ERROR] ComfyUI did NOT start before timeout")
     return False
 
+
 def queue_comfyui_deploy(workflow):
     try:
-        # Ensure workflow is a dict, not a string
         if isinstance(workflow, str):
             workflow = json.loads(workflow)
+
+        if "prompt" not in workflow:
+            workflow = {"prompt": workflow}
+
         req = requests.post(
-            f"{COMFY_BASE}/comfyui-deploy/run",
-            json=workflow  # <--- use json= instead of data=json.dumps(...)
+            f"{COMFY_BASE}/prompt",
+            json=workflow
         )
         return req.json()
     except Exception as e:
         return {"status": "error", "message": f"Failed to queue workflow: {str(e)}"}
 
+
 def check_status(prompt_id):
-    """Implements /comfyui-deploy/check-status"""
-    req = requests.get(f"{COMFY_BASE}/comfyui-deploy/check-status?prompt_id={prompt_id}")
-    return req.json()
+    try:
+        req = requests.get(f"{COMFY_BASE}/history/{prompt_id}")
+        return req.json()
+    except Exception as e:
+        return {"status": "error", "message": f"Status check failed: {str(e)}"}
+
 
 # ------------------ HANDLER ------------------
 
@@ -100,24 +121,29 @@ def handler(job):
     workflow = job_input.get("workflow")
     if not workflow:
         return {"error": "No workflow provided"}
-    
+
     if isinstance(workflow, str):
         try:
             workflow = json.loads(workflow)
         except Exception as e:
             return {"status": "error", "message": f"Invalid JSON workflow: {str(e)}"}
-    
+
+    # Queue job
     queued = queue_comfyui_deploy(workflow)
     prompt_id = queued.get("prompt_id")
+
     if not prompt_id:
         return {"status": "error", "response": queued, "refresh_worker": REFRESH_WORKER}
 
-    # Poll for completion
-    retries = 0
-    while retries < COMFY_POLLING_MAX_RETRIES:
+    # ---- WAIT UP TO 20 MINUTES ----
+    deadline = time.time() + COMFY_MAX_WAIT_SECONDS
+    print(f"[serverless] Waiting up to 20 minutes for result...")
+
+    while time.time() < deadline:
         try:
             status_result = check_status(prompt_id)
-            status = status_result.get("status", "").lower()
+            status = str(status_result.get("status", "")).lower()
+
             if status in ["success", "failed", "completed"]:
                 return {
                     "status": status,
@@ -125,17 +151,20 @@ def handler(job):
                     "response": status_result,
                     "refresh_worker": REFRESH_WORKER
                 }
+
         except Exception as e:
             print(f"[ERROR] Checking status failed: {e}")
-        retries += 1
+
         time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
-    
+
     return {
-        "status": "error",
+        "status": "timeout",
         "prompt_id": prompt_id,
-        "message": "Max retries reached while waiting for workflow to complete",
+        "message": "Workflow exceeded 20 minute limit",
         "refresh_worker": REFRESH_WORKER
     }
+
+
 # ------------------ MAIN ------------------
 
 if __name__ == "__main__":
