@@ -14,11 +14,9 @@ COMFY_PORT = int(os.environ.get("COMFY_PORT", 8188))
 COMFY_BASE = f"http://{COMFY_HOST}:{COMFY_PORT}"
 COMFY_OUTPUT_PATH = os.environ.get("COMFY_OUTPUT_PATH", "/runpod-volume/serverless-output")
 COMFY_INPUT_PATH = os.environ.get("COMFY_INPUT_PATH", "/runpod-volume/serverless-input")
-BOOT_TIMEOUT = int(os.environ.get("COMFY_BOOT_WAIT", 180))
-REFRESH_WORKER = os.environ.get("REFRESH_WORKER", "false").lower() == "true"
-
-COMFY_POLLING_INTERVAL_MS = 5000  # 5 seconds
-COMFY_POLLING_MAX_RETRIES = 360   # ~30 minutes max wait
+BOOT_TIMEOUT = int(os.environ.get("COMFY_BOOT_WAIT", 1800))  # 30 min boot/poll timeout
+COMFY_POLLING_INTERVAL_MS = 1000  # 1 second between polls
+COMFY_POLLING_MAX_RETRIES = 1200  # ~20 minutes
 
 proc = None
 proc_lock = Lock()
@@ -74,13 +72,24 @@ def wait_for_comfy(timeout=BOOT_TIMEOUT):
     print("[ERROR] ComfyUI did NOT start before timeout")
     return False
 
-# ------------------ WORKFLOW ENDPOINTS ------------------
+# ------------------ API METHODS ------------------
+
+def queue_prompt(workflow):
+    """Implements /prompt"""
+    try:
+        if isinstance(workflow, str):
+            workflow = json.loads(workflow)
+        req = requests.post(f"{COMFY_BASE}/prompt", json={"prompt": workflow})
+        return req.json()
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to queue prompt: {str(e)}"}
 
 def queue_comfyui_deploy(workflow):
     """Implements /comfyui-deploy/run"""
     try:
-        data = json.dumps(workflow).encode("utf-8")
-        req = requests.post(f"{COMFY_BASE}/comfyui-deploy/run", data=data, headers={"Content-Type": "application/json"})
+        if isinstance(workflow, str):
+            workflow = json.loads(workflow)
+        req = requests.post(f"{COMFY_BASE}/comfyui-deploy/run", json=workflow)
         return req.json()
     except Exception as e:
         return {"status": "error", "message": f"Failed to queue workflow: {str(e)}"}
@@ -98,42 +107,35 @@ def check_status(prompt_id):
 def handler(job):
     job_input = job.get("input")
     if not job_input:
-        return {"error": "No input provided"}
+        return {"status": "error", "message": "No input provided"}
 
     workflow = job_input.get("workflow")
     if not workflow:
-        return {"error": "No workflow provided"}
+        return {"status": "error", "message": "No workflow provided"}
 
-    # Queue workflow
+    # Queue workflow immediately
     queued = queue_comfyui_deploy(workflow)
-    if queued.get("status") == "error" or not queued.get("prompt_id"):
+    if queued.get("status") == "error":
         return {"status": "error", "response": queued}
 
-    prompt_id = queued["prompt_id"]
-    print(f"[serverless] Workflow queued with prompt_id: {prompt_id}")
+    prompt_id = queued.get("prompt_id")
+    if not prompt_id:
+        return {"status": "error", "response": queued, "message": "No prompt_id returned from ComfyUI"}
 
-    # Poll for completion
+    print(f"[serverless] Workflow queued, prompt_id={prompt_id}. Waiting for completion...")
+
+    # Poll for workflow completion (can take many minutes)
     retries = 0
     while retries < COMFY_POLLING_MAX_RETRIES:
-        status_result = check_status(prompt_id)
-        status = status_result.get("status", "").lower()
-        if status in ["success", "failed", "completed"]:
-            return {
-                "status": status,
-                "prompt_id": prompt_id,
-                "response": status_result,
-                "refresh_worker": REFRESH_WORKER
-            }
-        print(f"[serverless] Workflow in progress... retry {retries}")
+        st = check_status(prompt_id)
+        status = st.get("status")
+        if status in ["success", "failed", "error"]:
+            print(f"[serverless] Workflow finished with status: {status}")
+            return {"status": status, "prompt_id": prompt_id, "response": st}
         retries += 1
         time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
 
-    return {
-        "status": "error",
-        "prompt_id": prompt_id,
-        "message": "Max retries reached while waiting for workflow to complete",
-        "refresh_worker": REFRESH_WORKER
-    }
+    return {"status": "error", "prompt_id": prompt_id, "message": "Max retries reached"}
 
 # ------------------ MAIN ------------------
 
