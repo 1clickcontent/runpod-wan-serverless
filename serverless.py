@@ -25,7 +25,7 @@ proc_lock = Lock()
 
 # Polling interval and max wait time for long workflows
 COMFY_POLLING_INTERVAL_MS = 5000        # check every 5 seconds
-COMFY_MAX_WAIT_SECONDS = 40 * 60        # 20 minutes
+COMFY_MAX_WAIT_SECONDS = 60 * 60        # 60 minutes
 
 # Queue to collect log lines
 log_queue = Queue()
@@ -135,7 +135,7 @@ def handler(job):
 
     # Poll logs for completion (up to 20 minutes)
     deadline = time.time() + COMFY_MAX_WAIT_SECONDS
-    print(f"[serverless] Waiting up to 40 minutes for workflow completion...")
+    print(f"[serverless] Waiting up to 60 minutes for workflow completion...")
 
     while time.time() < deadline:
         try:
